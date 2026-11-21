@@ -115,6 +115,20 @@ except Exception as e:
     st.stop()
 
 # ==========================================
+# 금액 단위 변환 헬퍼 함수 (한국어 억/만/천 원)
+# ==========================================
+def format_korean_money(val_thousand):
+    val_won = val_thousand * 1000
+    if abs(val_won) >= 100_000_000:
+        return f"{val_won / 100_000_000:,.1f}억"
+    elif abs(val_won) >= 10_000_000:
+        return f"{val_won / 10_000_000:,.1f}천만"
+    elif abs(val_won) >= 10_000:
+        return f"{val_won / 10_000:,.0f}만"
+    else:
+        return f"{val_thousand:,}천"
+
+# ==========================================
 # 상단 타이틀
 # ==========================================
 st.title("2024년 소방청 전국 화재통계 분석 대시보드")
@@ -133,9 +147,9 @@ with st.sidebar:
     
     if exclude_unknown:
         df = df[df["발화요인대분류"] != "미상"]
-        st.warning(f"🔍 **'미상' 제외 적용 중**\n\n분석 데이터: **{len(df):,}건**")
+        st.warning(f" **'미상' 제외 적용 중**\n\n분석 데이터: **{len(df):,}건**")
     else:
-        st.success(f"📊 **전체 데이터 분석 중**\n\n총 데이터: **{len(df):,}건**")
+        st.success(f" **전체 데이터 분석 중**\n\n총 데이터: **{len(df):,}건**")
         
     st.markdown("---")
     st.info("상단 탭을 클릭하여 시공간 패턴, 장소·피해 심각도, 발화요인별 분석을 나누어 확인하실 수 있습니다.")
@@ -385,7 +399,7 @@ with tab1:
         top_sigungu = sigungu_counts.iloc[0] if not sigungu_counts.empty else None
         
         st.info(f"""
-        💡 **시공간 주요 관측 요약 (Key Insights)**
+         **시공간 주요 관측 요약 (Key Insights)**
         - **피크 시간대:** 화재가 가장 빈번한 시간대는 **{max_time_cell[0]} {max_time_cell[1]:02d}시 ({max_time_val:,}건)**이며, 주로 낮 11시 ~ 16시에 집중됩니다.
         - **지역 집중도:** 선택하신 **{selected_sido_bar}**에서는 **{top_sigungu['시_군_구']}**({top_sigungu['화재건수']:,}건, {top_sigungu['비중(%)']}%)가 가장 많았습니다.
         - **시기별 특징:** 3월(3,668건)과 12월(3,587건)에 연간 화재 발생률이 가장 높게 나타났습니다.
@@ -477,12 +491,23 @@ with tab2:
             key="t2_cmp_metric"
         )
         
-        target_places = st.multiselect(
-            "비교 대상 장소 대분류 선택",
-            options=major_places,
-            default=["주거", "산업시설", "자동차,철도차량", "생활서비스", "판매,업무시설"],
-            key="t2_places_multi"
-        )
+        # 특정 분야(산업시설 등) 피해금액 집중 시 격차를 보정하기 위한 로그 스케일 옵션
+        is_money_metric = "재산피해" in cmp_metric
+        col_cmp_sub1, col_cmp_sub2 = st.columns([1.5, 1])
+        with col_cmp_sub1:
+            target_places = st.multiselect(
+                "비교 대상 장소 대분류 선택",
+                options=major_places,
+                default=["주거", "산업시설", "자동차,철도차량", "생활서비스", "판매,업무시설"],
+                key="t2_places_multi"
+            )
+        with col_cmp_sub2:
+            use_log_bar = st.checkbox(
+                "로그 스케일 (Log Scale) 축 적용",
+                value=is_money_metric,
+                help="특정 장소의 압도적인 피해금액으로 인해 다른 장소의 수치가 묻히는 현상을 보정하여 고르게 비교합니다.",
+                key="t2_log_bar_chk"
+            )
 
         if target_places:
             cmp_df = df[df["장소대분류"].isin(target_places)]
@@ -497,26 +522,35 @@ with tab2:
             grouped_cmp["총_재산피해_억원"] = (grouped_cmp["재산피해_천원"] * 1000 / 100_000_000).round(2)
 
             if "건당 평균 재산피해액" in cmp_metric:
-                y_field, fmt = "건당_재산피해_만원", ":,.1f만원"
+                y_field, fmt, text_tmpl = "건당_재산피해_만원", ":,.1f만원", "%{y:,.0f}만"
             elif "건당 평균 인명피해" in cmp_metric:
-                y_field, fmt = "건당_인명피해_명", ":.3f명"
+                y_field, fmt, text_tmpl = "건당_인명피해_명", ":.3f명", "%{y:.2f}명"
             elif "총 재산피해액" in cmp_metric:
-                y_field, fmt = "총_재산피해_억원", ":,.2f억원"
+                y_field, fmt, text_tmpl = "총_재산피해_억원", ":,.2f억원", "%{y:,.1f}억"
             elif "총 인명피해" in cmp_metric:
-                y_field, fmt = "인명피해", ":,명"
+                y_field, fmt, text_tmpl = "인명피해", ":,명", "%{y:,}명"
             else:
-                y_field, fmt = "건수", ":,건"
+                y_field, fmt, text_tmpl = "건수", ":,건", "%{y:,}건"
 
             fig_cmp = px.bar(
                 grouped_cmp,
                 x="화재유형",
                 y=y_field,
+                text=y_field,
                 color="장소대분류",
                 barmode="group",
                 labels={"화재유형": "화재 유형", y_field: cmp_metric, "장소대분류": "장소 대분류"},
                 hover_data={"화재유형": True, "장소대분류": True, y_field: fmt}
             )
+            fig_cmp.update_traces(
+                texttemplate=text_tmpl,
+                textposition="outside",
+                textfont=dict(size=9, color="#000000"),
+                cliponaxis=False
+            )
             apply_chart_theme(fig_cmp, f"화재 유형 × 장소 대분류 [{cmp_metric}] 비교", height=580)
+            if use_log_bar:
+                fig_cmp.update_yaxes(type="log", title=f"<b>{cmp_metric} (로그 스케일)</b>")
             fig_cmp.update_layout(
                 xaxis_tickangle=-15,
                 legend=dict(title=dict(text="<b>장소 대분류</b>", font=dict(color="#000000")), font=dict(color="#000000"), orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
@@ -539,6 +573,16 @@ with tab3:
         cause_level = st.radio("발화요인 분류 기준", ["발화요인대분류", "발화요인소분류 (상위 15개)"], horizontal=True, key="t3_cause_radio")
     with t3_col2:
         heat_metric = st.selectbox("집계 지표 선택", ["화재 발생 건수 (건)", "인명피해 합계 (명)", "재산피해 합계 (천원)"], key="t3_metric_select")
+
+    is_damage_heat = "재산피해" in heat_metric
+    if is_damage_heat:
+        use_log_heat = st.toggle(
+            " 피해금액 로그 정규화 (Log Scale) 색상 적용 (권장)",
+            value=True,
+            help="산업시설 등 특정 분야의 압도적인 피해금액으로 인한 색상 쏠림을 보정하여 전 분야의 피해 규모를 고르게 시각화합니다."
+        )
+    else:
+        use_log_heat = False
 
     heat_data = df.copy()
     if "소분류" in cause_level:
@@ -565,31 +609,61 @@ with tab3:
     col_sort = pvt.sum(axis=0).sort_values(ascending=False).index
     pvt = pvt.reindex(index=row_sort, columns=col_sort)
 
-    # 배경색이 짙은 상위 고밀도 값(최대값의 50% 이상인 짙은 붉은색 영역)은 흰색(#ffffff), 그 외 밝은 배경은 검정색(#000000)으로 처리
-    max_val = float(pvt.values.max()) if pvt.values.max() > 0 else 1.0
-    threshold_heat = max_val * 0.5
+    # 색상 스케일 매핑용 z_color 계산 (재산피해이고 로그정규화 적용 시 log10 적용)
+    if is_damage_heat and use_log_heat:
+        z_color = np.log10(pvt.values + 1)
+        # 로그 스케일에서 0이 아닌 값들 중 상위 75% 백분위수를 임계값으로 적용
+        positive_logs = z_color[z_color > 0]
+        threshold_color = np.percentile(positive_logs, 75) if len(positive_logs) > 0 else 1.0
+    else:
+        z_color = pvt.values
+        max_val = float(pvt.values.max()) if pvt.values.max() > 0 else 1.0
+        threshold_color = max_val * 0.5
 
     annotations = []
-    for r_name in pvt.index:
-        for c_name in pvt.columns:
+    for r_idx, r_name in enumerate(pvt.index):
+        for c_idx, c_name in enumerate(pvt.columns):
             val = pvt.loc[r_name, c_name]
-            text_color = "#ffffff" if val >= threshold_heat else "#000000"
+            c_val = z_color[r_idx, c_idx]
+            text_color = "#ffffff" if c_val >= threshold_color else "#000000"
+            
+            # 재산피해일 때는 알아보기 쉬운 한국어 금액 단위(억/천만/만)로 표시
+            if is_damage_heat:
+                disp_text = format_korean_money(val)
+            else:
+                disp_text = f"{val:,}"
+
             annotations.append(dict(
                 x=c_name,
                 y=r_name,
-                text=f"{val:,}",
+                text=disp_text,
                 showarrow=False,
                 font=dict(size=10.5, color=text_color, family="sans-serif")
             ))
 
+    custom_tooltips = []
+    for r in pvt.index:
+        row_tips = []
+        for c in pvt.columns:
+            raw_v = pvt.loc[r, c]
+            if is_damage_heat:
+                row_tips.append(f"{format_korean_money(raw_v)}원 ({raw_v:,}천원)")
+            else:
+                row_tips.append(f"{raw_v:,}{u_str}")
+        custom_tooltips.append(row_tips)
+
     fig_heat_main = go.Figure(data=go.Heatmap(
-        z=pvt.values,
+        z=z_color,
         x=pvt.columns.tolist(),
         y=pvt.index.tolist(),
         colorscale=c_scale,
         hoverongaps=False,
-        hovertemplate="<b>장소:</b> %{x}<br><b>발화요인:</b> %{y}<br><b>값:</b> %{z:,} " + u_str + "<extra></extra>",
-        colorbar=dict(title=dict(text=u_str, font=dict(color="#000000")), tickfont=dict(color="#000000"))
+        customdata=custom_tooltips,
+        hovertemplate="<b>장소:</b> %{x}<br><b>발화요인:</b> %{y}<br><b>피해 수치:</b> %{customdata}<extra></extra>",
+        colorbar=dict(
+            title=dict(text="로그 스케일" if (is_damage_heat and use_log_heat) else u_str, font=dict(color="#000000")),
+            tickfont=dict(color="#000000")
+        )
     ))
     apply_chart_theme(fig_heat_main, f"[{cause_col_name} × 장소대분류] {heat_metric} 매트릭스", height=600)
     fig_heat_main.update_layout(
