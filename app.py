@@ -5,7 +5,6 @@ import os
 # 페이지 기본 설정
 st.set_page_config(
     page_title="2024년 소방청 화재통계 대시보드",
-    page_icon="🔥",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -65,14 +64,14 @@ except Exception as e:
     st.stop()
 
 # 대시보드 헤더
-st.title("🔥 2024년 소방청 전국 화재통계 분석 대시보드")
+st.title("2024년 소방청 전국 화재통계 분석 대시보드")
 st.caption("데이터 출처: 소방청 국가화재정보시스템 (2024년 1월 1일 ~ 12월 31일)")
 
 # 사이드바 (기본 안내 및 향후 필터 확장 대비)
-with st.sidebar:
-    st.header("⚙️ 대시보드 설정")
-    st.info("좌측 사이드바에서 추후 지역별/기간별 필터를 추가할 수 있습니다.")
-    st.write(f"**총 데이터 건수:** {len(df):,}건")
+# with st.sidebar:
+#     st.header("⚙️ 대시보드 설정")
+#     st.info("좌측 사이드바에서 추후 지역별/기간별 필터를 추가할 수 있습니다.")
+#     st.write(f"**총 데이터 건수:** {len(df):,}건")
 
 # 최상단 KPI 메트릭 계산
 total_fire_count = len(df)
@@ -93,7 +92,7 @@ col1, col2, col3 = st.columns(3)
 with col1:
     st.markdown(f"""
     <div class="metric-card card-fire">
-        <div class="metric-title">🔥 총 화재 건수</div>
+        <div class="metric-title">총 화재 건수</div>
         <div class="metric-value">{total_fire_count:,} <span style="font-size:1.2rem; font-weight:normal;">건</span></div>
         <div class="metric-sub">2024년 연간 누적 화재 발생 건수</div>
     </div>
@@ -102,7 +101,7 @@ with col1:
 with col2:
     st.markdown(f"""
     <div class="metric-card card-casualty">
-        <div class="metric-title">🚑 총 인명 피해</div>
+        <div class="metric-title">총 인명 피해</div>
         <div class="metric-value">{total_casualties:,} <span style="font-size:1.2rem; font-weight:normal;">명</span></div>
         <div class="metric-sub">사망 <b>{total_deaths:,}</b>명 &nbsp;|&nbsp; 부상 <b>{total_injuries:,}</b>명</div>
     </div>
@@ -111,7 +110,7 @@ with col2:
 with col3:
     st.markdown(f"""
     <div class="metric-card card-damage">
-        <div class="metric-title">💰 총 재산 피해</div>
+        <div class="metric-title">총 재산 피해</div>
         <div class="metric-value">{loss_in_hundred_millions:,.1f} <span style="font-size:1.2rem; font-weight:normal;">억 원</span></div>
         <div class="metric-sub">{total_property_loss_thousand:,} 천원 ({total_property_loss_won:,.0f}원)</div>
     </div>
@@ -124,14 +123,14 @@ import plotly.graph_objects as go
 # 시도별 · 시군구 막대그래프
 # ==========================================
 st.markdown("---")
-st.subheader("📍 시도별 · 시군구 화재 발생 건수 분석")
+st.subheader("시도별 · 시군구 화재 발생 건수 분석")
 
 # 시도 목록 (화재 발생 건수가 많은 순서로 기본 제공)
 sido_list = df["시도"].value_counts().index.tolist()
 
 col_sido_sel, col_sido_sort = st.columns([2, 1])
 with col_sido_sel:
-    selected_sido_bar = st.selectbox("🔍 분석할 시도를 선택하세요 :", options=sido_list, index=0, key="bar_sido_select")
+    selected_sido_bar = st.selectbox("분석할 시도를 선택하세요 :", options=sido_list, index=0, key="bar_sido_select")
 with col_sido_sort:
     sort_order = st.radio("시군구 정렬 기준", options=["화재건수 많은 순", "시군구 이름순"], horizontal=True, key="bar_sort_order")
 
@@ -185,7 +184,7 @@ st.plotly_chart(fig_bar, width="stretch")
 
 top_sigungu = sigungu_counts.iloc[0] if not sigungu_counts.empty else None
 if top_sigungu is not None:
-    st.caption(f"💡 **{selected_sido_bar} 1위 발생 지역:** **{top_sigungu['시_군_구']}** ({top_sigungu['화재건수']:,}건, {selected_sido_bar} 전체의 {top_sigungu['비중(%)']}%)")
+    st.caption(f" **{selected_sido_bar} 1위 발생 지역:** **{top_sigungu['시_군_구']}** ({top_sigungu['화재건수']:,}건, {selected_sido_bar} 전체의 {top_sigungu['비중(%)']}%)")
 
 st.markdown("---")
 
@@ -315,12 +314,12 @@ min_month = target_series.idxmin()
 avg_month = target_series.mean()
 
 st.caption(
-    f"💡 **월별 동향 요약 ({target_name}):** 2024년 {target_name}에서 화재가 가장 많이 발생한 달은 **{max_month}월({target_series[max_month]:,}건)**이며, "
+    f" **월별 동향 요약 ({target_name}):** 2024년 {target_name}에서 화재가 가장 많이 발생한 달은 **{max_month}월({target_series[max_month]:,}건)**이며, "
     f"가장 적게 발생한 달은 **{min_month}월({target_series[min_month]:,}건)**입니다. (월평균 **{avg_month:,.0f}건**)"
 )
 
 st.markdown("---")
-st.subheader("🔥 발화요인 × 장소대분류 히트맵 분석")
+st.subheader(" 발화요인 × 장소대분류 히트맵 분석")
 
 # 분석 옵션 (발화요인 레벨 및 집계 지표 선택)
 col_opt1, col_opt2 = st.columns([1, 1])
@@ -425,5 +424,5 @@ st.plotly_chart(fig, width="stretch")
 # 주요 관측 인사이트 요약
 top_cell = pivot_table.stack().idxmax()
 top_cell_val = pivot_table.stack().max()
-st.caption(f"💡 **주요 관측:** 가장 높은 수치를 기록한 조합은 **[{top_cell[0]} × {top_cell[1]}]** (총 **{top_cell_val:,}** {val_suffix}) 입니다.")
+st.caption(f" **주요 관측:** 가장 높은 수치를 기록한 조합은 **[{top_cell[0]} × {top_cell[1]}]** (총 **{top_cell_val:,}** {val_suffix}) 입니다.")
 
