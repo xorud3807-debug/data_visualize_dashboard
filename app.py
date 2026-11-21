@@ -360,6 +360,94 @@ st.caption(
     f"가장 적게 발생한 달은 **{min_month}월({target_series[min_month]:,}건)**입니다. (월평균 **{avg_month:,.0f}건**)"
 )
 
+
+# =========================================================================
+# 요일 · 시간대별 화재 발생 건수 히트맵
+# =========================================================================
+st.markdown("---")
+st.subheader("요일 · 시간대별 화재 발생 건수 히트맵")
+
+# 일시에서 요일과 시간 추출
+df["요일_idx"] = df["일시"].dt.weekday
+days_kr = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
+df["요일"] = df["요일_idx"].map(lambda x: days_kr[int(x)] if pd.notnull(x) else None)
+df["시간대"] = df["일시"].dt.hour
+
+col_time_opt1, col_time_opt2 = st.columns([1, 1])
+with col_time_opt1:
+    time_scope = st.radio(
+        "분석 대상 범위 (요일·시간 히트맵 전용)",
+        options=["전국 전체", "특정 시도 선택"],
+        horizontal=True,
+        key="time_heatmap_scope"
+    )
+
+with col_time_opt2:
+    selected_time_sido = st.selectbox(
+        "시도 선택 (요일·시간 히트맵):",
+        options=sido_list,
+        index=0,
+        disabled=(time_scope == "전국 전체"),
+        key="time_heatmap_sido"
+    )
+
+time_df = df if time_scope == "전국 전체" else df[df["시도"] == selected_time_sido]
+
+hours_list = list(range(24))
+hours_labels = [f"{h:02d}시" for h in hours_list]
+
+ct_day_hour = pd.crosstab(time_df["요일"], time_df["시간대"]).reindex(index=days_kr, columns=hours_list, fill_value=0)
+
+fig_day_hour = go.Figure(data=go.Heatmap(
+    z=ct_day_hour.values,
+    x=hours_labels,
+    y=days_kr,
+    colorscale="YlOrRd",
+    hoverongaps=False,
+    text=ct_day_hour.values,
+    texttemplate="%{text:,}",
+    textfont={"size": 10},
+    hovertemplate=(
+        "<b>%{y} %{x}</b><br>" +
+        "화재 발생: <b>%{z:,}건</b><extra></extra>"
+    ),
+    colorbar=dict(
+        title=dict(text="건수", side="top"),
+        tickformat=","
+    )
+))
+
+target_title_scope = "전국" if time_scope == "전국 전체" else selected_time_sido
+fig_day_hour.update_layout(
+    title=dict(
+        text=f"<b>[{target_title_scope}] 요일 × 시간대별 화재 발생 건수 히트맵 (총 {len(time_df):,}건)</b>",
+        font=dict(size=16)
+    ),
+    xaxis=dict(
+        title="<b>발생 시간대 (00시 ~ 23시)</b>",
+        tickmode="linear"
+    ),
+    yaxis=dict(
+        title="<b>요일</b>",
+        autorange="reversed" # 월요일이 맨 위, 일요일이 맨 아래
+    ),
+    height=390,
+    margin=dict(l=40, r=40, t=60, b=60),
+    paper_bgcolor="rgba(0,0,0,0)",
+    plot_bgcolor="rgba(0,0,0,0)"
+)
+
+st.plotly_chart(fig_day_hour, width="stretch")
+
+if not ct_day_hour.empty and ct_day_hour.values.sum() > 0:
+    max_cell = ct_day_hour.stack().idxmax()
+    max_val = ct_day_hour.stack().max()
+    st.caption(
+        f"**시간대 인사이트 ({target_title_scope}):** 화재가 가장 빈번하게 발생한 요일 및 시간대는 "
+        f"**[{max_cell[0]} {max_cell[1]:02d}시]** (총 **{max_val:,}건**) 입니다."
+    )
+
+
 # =========================================================================
 # 5. 장소별 발생·피해현황: 대분류 선택 시 중·소분류 단계적 탐색 막대그래프
 # =========================================================================
