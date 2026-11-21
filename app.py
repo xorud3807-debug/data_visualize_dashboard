@@ -120,7 +120,26 @@ except Exception as e:
 st.title("2024년 소방청 전국 화재통계 분석 대시보드")
 st.caption("데이터 출처: 소방청 국가화재정보시스템 (2024년 1월 1일 ~ 12월 31일)")
 
-                                        
+# 사이드바
+with st.sidebar:
+    st.header("데이터 필터 및 설정")
+    
+    # 발화요인 '미상' 제외 온/오프 토글 버튼
+    exclude_unknown = st.toggle(
+        "발화요인 '미상' 데이터 제외",
+        value=False,
+        help="발화요인이 '미상'으로 분류된 화재 데이터(약 3,051건)를 분석 대상에서 제외합니다."
+    )
+    
+    if exclude_unknown:
+        df = df[df["발화요인대분류"] != "미상"]
+        st.warning(f"🔍 **'미상' 제외 적용 중**\n\n분석 데이터: **{len(df):,}건**")
+    else:
+        st.success(f"📊 **전체 데이터 분석 중**\n\n총 데이터: **{len(df):,}건**")
+        
+    st.markdown("---")
+    st.info("상단 탭을 클릭하여 시공간 패턴, 장소·피해 심각도, 발화요인별 분석을 나누어 확인하실 수 있습니다.")
+
 # ==========================================
 # 상단 수치 카드 (원래 위치 3열 배치, 글씨 짤림 없음)
 # ==========================================
@@ -155,7 +174,7 @@ with col2:
         <div class="metric-value">{total_casualties:,} <span style="font-size:1.2rem; font-weight:normal; color:#475569;">명</span></div>
         <div class="metric-sub">
             사망 <b>{total_deaths:,}</b>명 &nbsp;|&nbsp; 부상 <b>{total_injuries:,}</b>명<br>
-            <span class="badge-sub">⚡ 100건당 인명피해: <b>{casualties_per_100:.2f}명</b></span>
+            <span class="badge-sub"> 100건당 인명피해: <b>{casualties_per_100:.2f}명</b></span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -163,11 +182,11 @@ with col2:
 with col3:
     st.markdown(f"""
     <div class="metric-card card-damage">
-        <div class="metric-title">총 재산 피해</div>
+        <div class="metric-title"> 총 재산 피해</div>
         <div class="metric-value">{loss_in_hundred_millions:,.1f} <span style="font-size:1.2rem; font-weight:normal; color:#475569;">억 원</span></div>
         <div class="metric-sub">
             {total_property_loss_thousand:,} 천원 ({total_property_loss_won:,.0f}원)<br>
-            <span class="badge-sub">건당 평균 피해액: <b>{avg_property_loss_manwon:,.0f}만 원</b> ({avg_property_loss_won:,.0f}원)</span>
+            <span class="badge-sub"> 건당 평균 피해액: <b>{avg_property_loss_manwon:,.0f}만 원</b> ({avg_property_loss_won:,.0f}원)</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -328,20 +347,33 @@ with tab1:
 
         ct_day_hour = pd.crosstab(df["요일"], df["시간대"]).reindex(index=days_kr, columns=hours_list, fill_value=0)
 
+        # 상위 75% 이상(상위 25% 고밀도 구간)은 흰색(#ffffff), 그 외에는 검정색(#000000)으로 표시하는 annotations 구성
+        q75_time = np.percentile(ct_day_hour.values, 75)
+        annotations_time = []
+        for r_name in ct_day_hour.index:
+            for c_idx, c_label in enumerate(hours_labels):
+                val = ct_day_hour.loc[r_name, c_idx]
+                text_color = "#ffffff" if val >= q75_time else "#000000"
+                annotations_time.append(dict(
+                    x=c_label,
+                    y=r_name,
+                    text=f"{val:,}",
+                    showarrow=False,
+                    font=dict(size=9.5, color=text_color, family="sans-serif")
+                ))
+
         fig_day_hour = go.Figure(data=go.Heatmap(
             z=ct_day_hour.values,
             x=hours_labels,
             y=days_kr,
             colorscale="YlOrRd",
             hoverongaps=False,
-            text=ct_day_hour.values,
-            texttemplate="%{text:,}",
-            textfont={"size": 10, "color": "#000000"},
             hovertemplate="<b>%{y} %{x}</b><br>화재 건수: <b>%{z:,}건</b><extra></extra>",
             colorbar=dict(title=dict(text="건수", font=dict(color="#000000")), tickfont=dict(color="#000000"))
         ))
         apply_chart_theme(fig_day_hour, "요일 및 시간대별 화재 발생 건수 분포 (전국)", height=560)
         fig_day_hour.update_layout(
+            annotations=annotations_time,
             xaxis=dict(tickangle=-45, title="<b>발생 시간대 (00시 ~ 23시)</b>", title_font=dict(color="#000000")),
             yaxis=dict(autorange="reversed", title="<b>요일</b>", title_font=dict(color="#000000"))
         )
@@ -353,7 +385,7 @@ with tab1:
         top_sigungu = sigungu_counts.iloc[0] if not sigungu_counts.empty else None
         
         st.info(f"""
-        **시공간 주요 관측 요약 (Key Insights)**
+        💡 **시공간 주요 관측 요약 (Key Insights)**
         - **피크 시간대:** 화재가 가장 빈번한 시간대는 **{max_time_cell[0]} {max_time_cell[1]:02d}시 ({max_time_val:,}건)**이며, 주로 낮 11시 ~ 16시에 집중됩니다.
         - **지역 집중도:** 선택하신 **{selected_sido_bar}**에서는 **{top_sigungu['시_군_구']}**({top_sigungu['화재건수']:,}건, {top_sigungu['비중(%)']}%)가 가장 많았습니다.
         - **시기별 특징:** 3월(3,668건)과 12월(3,587건)에 연간 화재 발생률이 가장 높게 나타났습니다.
@@ -533,20 +565,35 @@ with tab3:
     col_sort = pvt.sum(axis=0).sort_values(ascending=False).index
     pvt = pvt.reindex(index=row_sort, columns=col_sort)
 
+    # 배경색이 짙은 상위 고밀도 값(최대값의 50% 이상인 짙은 붉은색 영역)은 흰색(#ffffff), 그 외 밝은 배경은 검정색(#000000)으로 처리
+    max_val = float(pvt.values.max()) if pvt.values.max() > 0 else 1.0
+    threshold_heat = max_val * 0.5
+
+    annotations = []
+    for r_name in pvt.index:
+        for c_name in pvt.columns:
+            val = pvt.loc[r_name, c_name]
+            text_color = "#ffffff" if val >= threshold_heat else "#000000"
+            annotations.append(dict(
+                x=c_name,
+                y=r_name,
+                text=f"{val:,}",
+                showarrow=False,
+                font=dict(size=10.5, color=text_color, family="sans-serif")
+            ))
+
     fig_heat_main = go.Figure(data=go.Heatmap(
         z=pvt.values,
         x=pvt.columns.tolist(),
         y=pvt.index.tolist(),
         colorscale=c_scale,
         hoverongaps=False,
-        text=pvt.values,
-        texttemplate="%{text:,}",
-        textfont={"size": 11, "color": "#000000"},
         hovertemplate="<b>장소:</b> %{x}<br><b>발화요인:</b> %{y}<br><b>값:</b> %{z:,} " + u_str + "<extra></extra>",
         colorbar=dict(title=dict(text=u_str, font=dict(color="#000000")), tickfont=dict(color="#000000"))
     ))
     apply_chart_theme(fig_heat_main, f"[{cause_col_name} × 장소대분류] {heat_metric} 매트릭스", height=600)
     fig_heat_main.update_layout(
+        annotations=annotations,
         xaxis=dict(tickangle=-30, title="<b>장소 대분류</b>", title_font=dict(color="#000000")),
         yaxis=dict(autorange="reversed", title=f"<b>{cause_col_name}</b>", title_font=dict(color="#000000"))
     )
