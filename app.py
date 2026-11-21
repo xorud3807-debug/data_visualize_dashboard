@@ -120,6 +120,11 @@ except Exception as e:
 st.title("2024년 소방청 전국 화재통계 분석 대시보드")
 st.caption("데이터 출처: 소방청 국가화재정보시스템 (2024년 1월 1일 ~ 12월 31일)")
 
+# 사이드바
+with st.sidebar:
+    st.header("⚙️ 대시보드 정보")
+    st.write(f"**총 데이터 건수:** {len(df):,}건")
+    st.info("상단 탭을 클릭하여 시공간 패턴, 장소·피해 심각도, 발화요인별 분석을 나누어 확인하실 수 있습니다.")
 
 # ==========================================
 # 상단 수치 카드 (원래 위치 3열 배치, 글씨 짤림 없음)
@@ -155,7 +160,7 @@ with col2:
         <div class="metric-value">{total_casualties:,} <span style="font-size:1.2rem; font-weight:normal; color:#475569;">명</span></div>
         <div class="metric-sub">
             사망 <b>{total_deaths:,}</b>명 &nbsp;|&nbsp; 부상 <b>{total_injuries:,}</b>명<br>
-            <span class="badge-sub"> 100건당 인명피해: <b>{casualties_per_100:.2f}명</b></span>
+            <span class="badge-sub">⚡ 100건당 인명피해: <b>{casualties_per_100:.2f}명</b></span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -167,7 +172,7 @@ with col3:
         <div class="metric-value">{loss_in_hundred_millions:,.1f} <span style="font-size:1.2rem; font-weight:normal; color:#475569;">억 원</span></div>
         <div class="metric-sub">
             {total_property_loss_thousand:,} 천원 ({total_property_loss_won:,.0f}원)<br>
-            <span class="badge-sub"> 건당 평균 피해액: <b>{avg_property_loss_manwon:,.0f}만 원</b> ({avg_property_loss_won:,.0f}원)</span>
+            <span class="badge-sub">건당 평균 피해액: <b>{avg_property_loss_manwon:,.0f}만 원</b> ({avg_property_loss_won:,.0f}원)</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -248,11 +253,11 @@ with tab1:
         
         c_sel1, c_sel2 = st.columns([1.5, 1])
         with c_sel1:
-            selected_sido = st.selectbox("분석할 시도 선택:", options=sido_list, index=0, key="t1_sido_select")
+            selected_sido_bar = st.selectbox("분석할 시도 선택 (시군구 도표):", options=sido_list, index=0, key="t1_bar_sido_select")
         with c_sel2:
             sort_order = st.radio("정렬 기준", ["화재건수순", "이름순"], horizontal=True, key="t1_sort_order")
 
-        sido_df = df[df["시도"] == selected_sido]
+        sido_df = df[df["시도"] == selected_sido_bar]
         sigungu_counts = sido_df["시_군_구"].value_counts().reset_index()
         sigungu_counts.columns = ["시_군_구", "화재건수"]
 
@@ -274,15 +279,32 @@ with tab1:
             hover_data={"시_군_구": True, "화재건수": ":,", "비중(%)": ":.1f%"}
         )
         fig_bar.update_traces(texttemplate="%{text:,}건", textposition="outside", cliponaxis=False)
-        apply_chart_theme(fig_bar, f"[{selected_sido}] 시·군·구별 화재 발생 건수 (총 {len(sido_df):,}건)", height=420)
+        apply_chart_theme(fig_bar, f"[{selected_sido_bar}] 시·군·구별 화재 발생 건수 (총 {len(sido_df):,}건)", height=420)
         fig_bar.update_layout(xaxis_tickangle=-35, coloraxis_showscale=False)
         st.plotly_chart(fig_bar, width="stretch")
 
-        # 3. 월별 화재 발생 추이
+        # 3. 월별 화재 발생 추이 (독립적인 시도 선택 옵션)
         st.markdown("<div class='chart-section-title' style='margin-top:20px;'>3. 월별 화재 발생 추이 (2024년)</div>", unsafe_allow_html=True)
-        line_scope = st.radio("분석 범위", ["전국 전체", f"{selected_sido}"], horizontal=True, key="t1_line_scope")
         
-        target_df = df if line_scope == "전국 전체" else sido_df
+        c_line1, c_line2 = st.columns([1.2, 1.3])
+        with c_line1:
+            line_scope = st.radio("분석 범위 (월별 도표):", ["전국 전체", "특정 시도"], horizontal=True, key="t1_line_scope")
+        with c_line2:
+            selected_sido_line = st.selectbox(
+                "월별 분석 시도 선택:",
+                options=sido_list,
+                index=0,
+                disabled=(line_scope == "전국 전체"),
+                key="t1_line_sido_select"
+            )
+        
+        if line_scope == "전국 전체":
+            target_df = df
+            line_chart_title = "2024년 전국 월별 화재 발생 추이"
+        else:
+            target_df = df[df["시도"] == selected_sido_line]
+            line_chart_title = f"2024년 [{selected_sido_line}] 월별 화재 발생 추이"
+
         all_months = list(range(1, 13))
         month_labels = [f"{m}월" for m in all_months]
         month_counts = target_df["월"].value_counts().reindex(all_months, fill_value=0)
@@ -298,7 +320,7 @@ with tab1:
             marker=dict(size=7, color="#ef4444"),
             hovertemplate="%{x}: <b>%{y:,}건</b><extra></extra>"
         ))
-        apply_chart_theme(fig_line, f"2024년 {line_scope} 월별 화재 발생 추이", height=380)
+        apply_chart_theme(fig_line, line_chart_title, height=380)
         st.plotly_chart(fig_line, width="stretch")
 
     with col_t1_right:
@@ -336,9 +358,9 @@ with tab1:
         top_sigungu = sigungu_counts.iloc[0] if not sigungu_counts.empty else None
         
         st.info(f"""
-         **시공간 주요 관측 요약 (Key Insights)**
+        **시공간 주요 관측 요약 (Key Insights)**
         - **피크 시간대:** 화재가 가장 빈번한 시간대는 **{max_time_cell[0]} {max_time_cell[1]:02d}시 ({max_time_val:,}건)**이며, 주로 낮 11시 ~ 16시에 집중됩니다.
-        - **지역 집중도:** 선택하신 **{selected_sido}**에서는 **{top_sigungu['시_군_구']}**({top_sigungu['화재건수']:,}건, {top_sigungu['비중(%)']}%)가 가장 많았습니다.
+        - **지역 집중도:** 선택하신 **{selected_sido_bar}**에서는 **{top_sigungu['시_군_구']}**({top_sigungu['화재건수']:,}건, {top_sigungu['비중(%)']}%)가 가장 많았습니다.
         - **시기별 특징:** 3월(3,668건)과 12월(3,587건)에 연간 화재 발생률이 가장 높게 나타났습니다.
         """)
 
@@ -537,4 +559,4 @@ with tab3:
 
     top_pair = pvt.stack().idxmax()
     top_pair_val = pvt.stack().max()
-    st.info(f"**발화요인 인사이트:** 가장 높은 수치를 기록한 조합은 **[{top_pair[0]} × {top_pair[1]}]** (총 **{top_pair_val:,} {u_str}**) 입니다.")
+    st.info(f" **발화요인 인사이트:** 가장 높은 수치를 기록한 조합은 **[{top_pair[0]} × {top_pair[1]}]** (총 **{top_pair_val:,} {u_str}**) 입니다.")
