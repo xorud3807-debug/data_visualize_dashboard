@@ -15,35 +15,37 @@ st.set_page_config(
 )
 
 # ==========================================
-# 커스텀 CSS (상단 수치카드 3열 복원 & 선명한 가독성)
+# 커스텀 CSS (Streamlit 다크모드/라이트모드 100% 자동 반응)
 # ==========================================
 st.markdown("""
 <style>
-    /* 상단 수치 카드 (3열 원래 배치, 넓고 시원한 카드) */
+    /* 상단 수치 카드 (Streamlit 시스템 테마 변수 연동) */
     .metric-card {
-        background: #ffffff;
-        border: 1px solid #e2e8f0;
+        background-color: var(--secondary-background-color);
+        border: 1px solid rgba(128, 128, 128, 0.2);
         border-radius: 12px;
         padding: 20px 22px;
-        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
         margin-bottom: 8px;
     }
     .metric-title {
         font-size: 0.95rem;
         font-weight: 700;
-        color: #475569;
+        color: var(--text-color);
+        opacity: 0.85;
         margin-bottom: 6px;
     }
     .metric-value {
         font-size: 2.1rem;
         font-weight: 800;
-        color: #0f172a;
+        color: var(--text-color);
         letter-spacing: -0.02em;
         line-height: 1.2;
     }
     .metric-sub {
         font-size: 0.88rem;
-        color: #334155;
+        color: var(--text-color);
+        opacity: 0.9;
         margin-top: 8px;
         line-height: 1.5;
     }
@@ -54,15 +56,15 @@ st.markdown("""
     .badge-sub {
         display: inline-block;
         margin-top: 5px;
-        padding: 2px 8px;
+        padding: 3px 8px;
         border-radius: 4px;
-        background-color: #f1f5f9;
-        color: #0f172a;
+        background-color: rgba(128, 128, 128, 0.15);
+        color: var(--text-color);
         font-size: 0.82rem;
         font-weight: 600;
     }
 
-    /* 탭 헤더 스타일 */
+    /* 탭 헤더 스타일 (테마 연동) */
     .stTabs [data-baseweb="tab-list"] {
         gap: 16px;
         margin-top: 1rem;
@@ -72,18 +74,20 @@ st.markdown("""
         font-size: 1.05rem;
         font-weight: 700;
         padding: 10px 18px;
-        color: #475569;
+        color: var(--text-color);
+        opacity: 0.75;
     }
     .stTabs [aria-selected="true"] {
         color: #ef4444 !important;
+        opacity: 1.0 !important;
         border-bottom: 3px solid #ef4444 !important;
     }
 
-    /* 도표 제목용 섹션 헤더 (검정색) */
+    /* 도표 제목용 섹션 헤더 (테마 연동) */
     .chart-section-title {
         font-size: 1.15rem;
         font-weight: 800;
-        color: #000000;
+        color: var(--text-color);
         margin-bottom: 8px;
     }
 </style>
@@ -176,7 +180,7 @@ with col1:
     st.markdown(f"""
     <div class="metric-card card-fire">
         <div class="metric-title">총 화재 건수</div>
-        <div class="metric-value">{total_fire_count:,} <span style="font-size:1.2rem; font-weight:normal; color:#475569;">건</span></div>
+        <div class="metric-value">{total_fire_count:,} <span style="font-size:1.2rem; font-weight:normal; opacity:0.75;">건</span></div>
         <div class="metric-sub">2024년 연간 누적 화재 발생 건수</div>
     </div>
     """, unsafe_allow_html=True)
@@ -185,7 +189,7 @@ with col2:
     st.markdown(f"""
     <div class="metric-card card-casualty">
         <div class="metric-title">총 인명 피해</div>
-        <div class="metric-value">{total_casualties:,} <span style="font-size:1.2rem; font-weight:normal; color:#475569;">명</span></div>
+        <div class="metric-value">{total_casualties:,} <span style="font-size:1.2rem; font-weight:normal; opacity:0.75;">명</span></div>
         <div class="metric-sub">
             사망 <b>{total_deaths:,}</b>명 &nbsp;|&nbsp; 부상 <b>{total_injuries:,}</b>명<br>
             <span class="badge-sub"> 100건당 인명피해: <b>{casualties_per_100:.2f}명</b></span>
@@ -197,7 +201,7 @@ with col3:
     st.markdown(f"""
     <div class="metric-card card-damage">
         <div class="metric-title"> 총 재산 피해</div>
-        <div class="metric-value">{loss_in_hundred_millions:,.1f} <span style="font-size:1.2rem; font-weight:normal; color:#475569;">억 원</span></div>
+        <div class="metric-value">{loss_in_hundred_millions:,.1f} <span style="font-size:1.2rem; font-weight:normal; opacity:0.75;">억 원</span></div>
         <div class="metric-sub">
             {total_property_loss_thousand:,} 천원 ({total_property_loss_won:,.0f}원)<br>
             <span class="badge-sub"> 건당 평균 피해액: <b>{avg_property_loss_manwon:,.0f}만 원</b> ({avg_property_loss_won:,.0f}원)</span>
@@ -205,30 +209,29 @@ with col3:
     </div>
     """, unsafe_allow_html=True)
 
-# 공통 도표 스타일 템플릿 (제목 및 글자색을 명확한 검정으로 설정)
+# 공통 도표 스타일 템플릿 (Streamlit 다크/라이트 테마 자동 연동)
 def apply_chart_theme(fig, title_text, height=450):
     fig.update_layout(
         title=dict(
             text=f"<b>{title_text}</b>",
-            font=dict(size=16, color="#000000"),
+            font=dict(size=16),
             x=0,
             xanchor="left"
         ),
-        font=dict(color="#000000"),
         height=height,
         margin=dict(l=40, r=30, t=55, b=60),
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)"
     )
     fig.update_xaxes(
-        title_font=dict(color="#000000", size=12),
-        tickfont=dict(color="#000000", size=11),
-        gridcolor="rgba(0,0,0,0.08)"
+        title_font=dict(size=12),
+        tickfont=dict(size=11),
+        gridcolor="rgba(128,128,128,0.15)"
     )
     fig.update_yaxes(
-        title_font=dict(color="#000000", size=12),
-        tickfont=dict(color="#000000", size=11),
-        gridcolor="rgba(0,0,0,0.08)"
+        title_font=dict(size=12),
+        tickfont=dict(size=11),
+        gridcolor="rgba(128,128,128,0.15)"
     )
     return fig
 
@@ -383,13 +386,13 @@ with tab1:
             colorscale="YlOrRd",
             hoverongaps=False,
             hovertemplate="<b>%{y} %{x}</b><br>화재 건수: <b>%{z:,}건</b><extra></extra>",
-            colorbar=dict(title=dict(text="건수", font=dict(color="#000000")), tickfont=dict(color="#000000"))
+            colorbar=dict(title=dict(text="건수"))
         ))
         apply_chart_theme(fig_day_hour, "요일 및 시간대별 화재 발생 건수 분포 (전국)", height=560)
         fig_day_hour.update_layout(
             annotations=annotations_time,
-            xaxis=dict(tickangle=-45, title="<b>발생 시간대 (00시 ~ 23시)</b>", title_font=dict(color="#000000")),
-            yaxis=dict(autorange="reversed", title="<b>요일</b>", title_font=dict(color="#000000"))
+            xaxis=dict(tickangle=-45, title="<b>발생 시간대 (00시 ~ 23시)</b>"),
+            yaxis=dict(autorange="reversed", title="<b>요일</b>")
         )
         st.plotly_chart(fig_day_hour, width="stretch")
 
@@ -545,7 +548,7 @@ with tab2:
             fig_cmp.update_traces(
                 texttemplate=text_tmpl,
                 textposition="outside",
-                textfont=dict(size=9, color="#000000"),
+                textfont=dict(size=9),
                 cliponaxis=False
             )
             apply_chart_theme(fig_cmp, f"화재 유형 × 장소 대분류 [{cmp_metric}] 비교", height=580)
@@ -553,7 +556,7 @@ with tab2:
                 fig_cmp.update_yaxes(type="log", title=f"<b>{cmp_metric} (로그 스케일)</b>")
             fig_cmp.update_layout(
                 xaxis_tickangle=-15,
-                legend=dict(title=dict(text="<b>장소 대분류</b>", font=dict(color="#000000")), font=dict(color="#000000"), orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                legend=dict(title=dict(text="<b>장소 대분류</b>"), orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
             st.plotly_chart(fig_cmp, width="stretch")
 
@@ -661,15 +664,14 @@ with tab3:
         customdata=custom_tooltips,
         hovertemplate="<b>장소:</b> %{x}<br><b>발화요인:</b> %{y}<br><b>피해 수치:</b> %{customdata}<extra></extra>",
         colorbar=dict(
-            title=dict(text="로그 스케일" if (is_damage_heat and use_log_heat) else u_str, font=dict(color="#000000")),
-            tickfont=dict(color="#000000")
+            title=dict(text="로그 스케일" if (is_damage_heat and use_log_heat) else u_str)
         )
     ))
     apply_chart_theme(fig_heat_main, f"[{cause_col_name} × 장소대분류] {heat_metric} 매트릭스", height=600)
     fig_heat_main.update_layout(
         annotations=annotations,
-        xaxis=dict(tickangle=-30, title="<b>장소 대분류</b>", title_font=dict(color="#000000")),
-        yaxis=dict(autorange="reversed", title=f"<b>{cause_col_name}</b>", title_font=dict(color="#000000"))
+        xaxis=dict(tickangle=-30, title="<b>장소 대분류</b>"),
+        yaxis=dict(autorange="reversed", title=f"<b>{cause_col_name}</b>")
     )
     st.plotly_chart(fig_heat_main, width="stretch")
 
