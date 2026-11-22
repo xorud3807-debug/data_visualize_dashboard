@@ -52,7 +52,7 @@ st.markdown("""
     .card-fire { border-top: 4px solid #ef4444; }
     .card-casualty { border-top: 4px solid #f97316; }
     .card-damage { border-top: 4px solid #eab308; }
-    
+
     .badge-sub {
         display: inline-block;
         margin-top: 5px;
@@ -102,7 +102,7 @@ def load_data():
     if not os.path.exists(file_path):
         current_dir = os.path.dirname(os.path.abspath(__file__))
         file_path = os.path.join(current_dir, file_path)
-    
+
     df = pd.read_csv(file_path, encoding="cp949")
     if "일시" in df.columns:
         df["일시"] = pd.to_datetime(df["일시"], errors="coerce")
@@ -141,25 +141,24 @@ st.caption("데이터 출처: 소방청 국가화재정보시스템 (2024년 1�
 # 사이드바
 with st.sidebar:
     st.header("데이터 필터 및 설정")
-    
-    # 발화요인 '미상' 제외 온/오프 토글 버튼
+
     exclude_unknown = st.toggle(
         "발화요인 '미상' 데이터 제외",
         value=False,
         help="발화요인이 '미상'으로 분류된 화재 데이터(약 3,051건)를 분석 대상에서 제외합니다."
     )
-    
+
     if exclude_unknown:
         df = df[df["발화요인대분류"] != "미상"]
-        st.warning(f" **'미상' 제외 적용 중**\n\n분석 데이터: **{len(df):,}건**")
+        st.warning(f"**'미상' 제외 적용 중**\n\n분석 데이터: **{len(df):,}건**")
     else:
-        st.success(f" **전체 데이터 분석 중**\n\n총 데이터: **{len(df):,}건**")
-        
+        st.success(f"**전체 데이터 분석 중**\n\n총 데이터: **{len(df):,}건**")
+
     st.markdown("---")
-    st.info("상단 탭을 클릭하여 시공간 패턴, 장소·피해 심각도, 발화요인별 분석을 나누어 확인하실 수 있습니다.")
+    st.info("상단 탭을 클릭하여 시공간 발생 패턴, 화재 유형·장소 및 피해 심각도, 발화요인 심층 분석을 확인하실 수 있습니다.")
 
 # ==========================================
-# 상단 수치 카드 (원래 위치 3열 배치, 글씨 짤림 없음)
+# 상단 수치 카드 (3열 배치)
 # ==========================================
 total_fire_count = len(df)
 total_casualties = df["인명피해(명)소계"].sum()
@@ -192,7 +191,7 @@ with col2:
         <div class="metric-value">{total_casualties:,} <span style="font-size:1.2rem; font-weight:normal; opacity:0.75;">명</span></div>
         <div class="metric-sub">
             사망 <b>{total_deaths:,}</b>명 &nbsp;|&nbsp; 부상 <b>{total_injuries:,}</b>명<br>
-            <span class="badge-sub"> 100건당 인명피해: <b>{casualties_per_100:.2f}명</b></span>
+            <span class="badge-sub">100건당 인명피해: <b>{casualties_per_100:.2f}명</b></span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -200,16 +199,16 @@ with col2:
 with col3:
     st.markdown(f"""
     <div class="metric-card card-damage">
-        <div class="metric-title"> 총 재산 피해</div>
+        <div class="metric-title">총 재산 피해</div>
         <div class="metric-value">{loss_in_hundred_millions:,.1f} <span style="font-size:1.2rem; font-weight:normal; opacity:0.75;">억 원</span></div>
         <div class="metric-sub">
             {total_property_loss_thousand:,} 천원 ({total_property_loss_won:,.0f}원)<br>
-            <span class="badge-sub"> 건당 평균 피해액: <b>{avg_property_loss_manwon:,.0f}만 원</b> ({avg_property_loss_won:,.0f}원)</span>
+            <span class="badge-sub">건당 평균 피해액: <b>{avg_property_loss_manwon:,.0f}만 원</b> ({avg_property_loss_won:,.0f}원)</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-# 공통 도표 스타일 템플릿 (Streamlit 다크/라이트 테마 자동 연동)
+# 공통 도표 스타일 템플릿
 def apply_chart_theme(fig, title_text, height=450):
     fig.update_layout(
         title=dict(
@@ -236,52 +235,28 @@ def apply_chart_theme(fig, title_text, height=450):
     return fig
 
 # ==========================================
-# 탭 형식 구성 (3개 탭)
+# 재구성된 탭 구성 (3개 탭)
 # ==========================================
 st.markdown("---")
 tab1, tab2, tab3 = st.tabs([
-    " 시공간 패턴 분석",
-    " 장소 · 피해 심각도 분석",
-    " 발화요인 심층 분석"
+    "시공간 발생 패턴",
+    "화재 유형 · 장소 및 피해 심각도",
+    "발화요인 심층 분석"
 ])
 
 # ----------------------------------------------------
-# TAB 1: 시공간 패턴 분석
+# TAB 1: 시공간 발생 패턴
+# ① 시도/시군구 건수 / ② 월별 추이 / ③ 요일×시간대 히트맵
 # ----------------------------------------------------
 with tab1:
-    # 1. 화재 유형별 건수·비중
-    st.markdown("<div class='chart-section-title'>1. 화재 유형별 발생 건수 및 비중</div>", unsafe_allow_html=True)
-    fire_type_counts = df["화재유형"].value_counts().reset_index()
-    fire_type_counts.columns = ["화재유형", "화재건수"]
-    fire_type_counts["비중(%)"] = (fire_type_counts["화재건수"] / total_fire_count * 100).round(1)
-
-    fig_type = px.bar(
-        fire_type_counts.sort_values(by="화재건수", ascending=True),
-        x="화재건수",
-        y="화재유형",
-        orientation="h",
-        text=fire_type_counts.sort_values(by="화재건수", ascending=True).apply(
-            lambda r: f"{r['화재건수']:,}건 ({r['비중(%)']}%)", axis=1
-        ),
-        color="화재건수",
-        color_continuous_scale="Reds",
-        labels={"화재유형": "화재 유형", "화재건수": "화재 발생 건수 (건)"}
-    )
-    fig_type.update_traces(textposition="outside", cliponaxis=False)
-    apply_chart_theme(fig_type, "화재 유형별 발생 건수 및 비중 (2024년)", height=320)
-    fig_type.update_layout(coloraxis_showscale=False)
-    st.plotly_chart(fig_type, width="stretch")
-
-    st.markdown("---")
-
-    # 2열 분할 레이아웃: 좌(시도/시군구 막대 + 월별 추이) / 우(요일-시간 히트맵)
+    st.markdown("<div class='chart-section-title'>지역·시기·시간대별 화재 발생 패턴</div>", unsafe_allow_html=True)
     col_t1_left, col_t1_right = st.columns([1.1, 1], gap="medium")
 
     with col_t1_left:
-        # 2. 시도별 · 시군구 막대그래프
-        st.markdown("<div class='chart-section-title'>2. 시도별 · 시군구 화재 발생 건수</div>", unsafe_allow_html=True)
+        # ① 시도/시군구 막대그래프
+        st.markdown("<div class='chart-section-title'>1. 시도 · 시군구별 화재 발생 건수</div>", unsafe_allow_html=True)
         sido_list = df["시도"].value_counts().index.tolist()
-        
+
         c_sel1, c_sel2 = st.columns([1.5, 1])
         with c_sel1:
             selected_sido_bar = st.selectbox("분석할 시도 선택 (시군구 도표):", options=sido_list, index=0, key="t1_bar_sido_select")
@@ -312,11 +287,11 @@ with tab1:
         fig_bar.update_traces(texttemplate="%{text:,}건", textposition="outside", cliponaxis=False)
         apply_chart_theme(fig_bar, f"[{selected_sido_bar}] 시·군·구별 화재 발생 건수 (총 {len(sido_df):,}건)", height=420)
         fig_bar.update_layout(xaxis_tickangle=-35, coloraxis_showscale=False)
-        st.plotly_chart(fig_bar, width="stretch")
+        st.plotly_chart(fig_bar, use_container_width=True)
 
-        # 3. 월별 화재 발생 추이 (독립적인 시도 선택 옵션)
-        st.markdown("<div class='chart-section-title' style='margin-top:20px;'>3. 월별 화재 발생 추이 (2024년)</div>", unsafe_allow_html=True)
-        
+        # ② 월별 화재 발생 추이
+        st.markdown("<div class='chart-section-title' style='margin-top:20px;'>2. 월별 화재 발생 추이 (2024년)</div>", unsafe_allow_html=True)
+
         c_line1, c_line2 = st.columns([1.2, 1.3])
         with c_line1:
             line_scope = st.radio("분석 범위 (월별 도표):", ["전국 전체", "특정 시도"], horizontal=True, key="t1_line_scope")
@@ -328,7 +303,7 @@ with tab1:
                 disabled=(line_scope == "전국 전체"),
                 key="t1_line_sido_select"
             )
-        
+
         if line_scope == "전국 전체":
             target_df = df
             line_chart_title = "2024년 전국 월별 화재 발생 추이"
@@ -352,19 +327,18 @@ with tab1:
             hovertemplate="%{x}: <b>%{y:,}건</b><extra></extra>"
         ))
         apply_chart_theme(fig_line, line_chart_title, height=380)
-        st.plotly_chart(fig_line, width="stretch")
+        st.plotly_chart(fig_line, use_container_width=True)
 
     with col_t1_right:
-        # 4. 요일 × 시간대별 화재 발생 건수 히트맵
-        st.markdown("<div class='chart-section-title'>4. 요일 · 시간대별 화재 발생 건수 히트맵</div>", unsafe_allow_html=True)
-        
+        # ③ 요일 × 시간대별 화재 발생 건수 히트맵
+        st.markdown("<div class='chart-section-title'>3. 요일 · 시간대별 화재 발생 건수 히트맵</div>", unsafe_allow_html=True)
+
         days_kr = ["월요일", "화요일", "수요일", "목요일", "금요일", "토요일", "일요일"]
         hours_list = list(range(24))
         hours_labels = [f"{h:02d}시" for h in hours_list]
 
         ct_day_hour = pd.crosstab(df["요일"], df["시간대"]).reindex(index=days_kr, columns=hours_list, fill_value=0)
 
-        # 상위 75% 이상(상위 25% 고밀도 구간)은 흰색(#ffffff), 그 외에는 검정색(#000000)으로 표시하는 annotations 구성
         q75_time = np.percentile(ct_day_hour.values, 75)
         annotations_time = []
         for r_name in ct_day_hour.index:
@@ -394,31 +368,58 @@ with tab1:
             xaxis=dict(tickangle=-45, title="<b>발생 시간대 (00시 ~ 23시)</b>"),
             yaxis=dict(autorange="reversed", title="<b>요일</b>")
         )
-        st.plotly_chart(fig_day_hour, width="stretch")
+        st.plotly_chart(fig_day_hour, use_container_width=True)
 
-        # 주요 관측 요약 카드
         max_time_cell = ct_day_hour.stack().idxmax()
         max_time_val = ct_day_hour.stack().max()
         top_sigungu = sigungu_counts.iloc[0] if not sigungu_counts.empty else None
-        
+        top_month_idx = month_counts.idxmax()
+        top_month_val = month_counts.max()
+
         st.info(f"""
-         **시공간 주요 관측 요약 (Key Insights)**
-        - **피크 시간대:** 화재가 가장 빈번한 시간대는 **{max_time_cell[0]} {max_time_cell[1]:02d}시 ({max_time_val:,}건)**이며, 주로 낮 11시 ~ 16시에 집중됩니다.
+        **시공간 주요 관측 요약 (Key Insights)**
+        - **피크 시간대:** 가장 빈번한 시간대는 **{max_time_cell[0]} {max_time_cell[1]:02d}시 ({max_time_val:,}건)**입니다.
         - **지역 집중도:** 선택하신 **{selected_sido_bar}**에서는 **{top_sigungu['시_군_구']}**({top_sigungu['화재건수']:,}건, {top_sigungu['비중(%)']}%)가 가장 많았습니다.
-        - **시기별 특징:** 3월(3,668건)과 12월(3,587건)에 연간 화재 발생률이 가장 높게 나타났습니다.
+        - **월별 최고점:** 현재 선택 범위 기준 **{top_month_idx}월 ({top_month_val:,}건)**에 가장 많은 화재가 발생했습니다.
         """)
 
 # ----------------------------------------------------
-# TAB 2: 장소 · 피해 심각도 분석
+# TAB 2: 화재 유형 · 장소 및 피해 심각도
+# ① 화재 유형별 건수·비중 / ② 장소 계층(대→중→소) 분석 / ③ 유형×장소별 인명/재산 피해 심각도 비교
 # ----------------------------------------------------
 with tab2:
-    st.markdown("<div class='chart-section-title'> 장소별 발생·피해 현황 및 심각도 분석</div>", unsafe_allow_html=True)
-    
+    # ① 화재 유형별 건수·비중
+    st.markdown("<div class='chart-section-title'>1. 화재 유형별 발생 건수 및 비중</div>", unsafe_allow_html=True)
+    fire_type_counts = df["화재유형"].value_counts().reset_index()
+    fire_type_counts.columns = ["화재유형", "화재건수"]
+    fire_type_counts["비중(%)"] = (fire_type_counts["화재건수"] / total_fire_count * 100).round(1) if total_fire_count > 0 else 0
+
+    fig_type = px.bar(
+        fire_type_counts.sort_values(by="화재건수", ascending=True),
+        x="화재건수",
+        y="화재유형",
+        orientation="h",
+        text=fire_type_counts.sort_values(by="화재건수", ascending=True).apply(
+            lambda r: f"{r['화재건수']:,}건 ({r['비중(%)']}%)", axis=1
+        ),
+        color="화재건수",
+        color_continuous_scale="Reds",
+        labels={"화재유형": "화재 유형", "화재건수": "화재 발생 건수 (건)"}
+    )
+    fig_type.update_traces(textposition="outside", cliponaxis=False)
+    apply_chart_theme(fig_type, "화재 유형별 발생 건수 및 비중 (2024년)", height=320)
+    fig_type.update_layout(coloraxis_showscale=False)
+    st.plotly_chart(fig_type, use_container_width=True)
+
+    st.markdown("---")
+
+    # ② 장소 계층(대→중→소) 분석 & ③ 유형×장소별 인명/재산 피해 심각도 비교
     col_t2_left, col_t2_right = st.columns([1.1, 1], gap="medium")
 
     with col_t2_left:
-        st.subheader("1. 장소 계층 분석 (대분류 → 중·소분류 단계적 탐색)")
-        
+        st.markdown("<div class='chart-section-title'>2. 장소 계층 분석 (대분류 → 중·소분류)</div>", unsafe_allow_html=True)
+
+        major_places = df["장소대분류"].value_counts().index.tolist()
         p_opt1, p_opt2 = st.columns([1, 1])
         with p_opt1:
             place_metric = st.selectbox(
@@ -427,7 +428,6 @@ with tab2:
                 key="t2_place_metric"
             )
         with p_opt2:
-            major_places = df["장소대분류"].value_counts().index.tolist()
             selected_major = st.selectbox("1단계: 장소 대분류 선택", major_places, index=0, key="t2_major_select")
 
         major_df = df[df["장소대분류"] == selected_major]
@@ -448,7 +448,6 @@ with tab2:
             res = res.sort_values(by="값", ascending=False)
             return res, unit
 
-        # 중분류 막대그래프
         mid_agg, p_unit = get_place_agg(major_df, "장소중분류", place_metric)
         fig_mid = px.bar(
             mid_agg,
@@ -462,9 +461,8 @@ with tab2:
         fig_mid.update_traces(texttemplate="%{text:,}" + p_unit, textposition="outside", cliponaxis=False)
         apply_chart_theme(fig_mid, f"[1단계: {selected_major}] 중분류별 {place_metric}", height=380)
         fig_mid.update_layout(xaxis_tickangle=-30, coloraxis_showscale=False)
-        st.plotly_chart(fig_mid, width="stretch")
+        st.plotly_chart(fig_mid, use_container_width=True)
 
-        # 2단계: 소분류 막대그래프 (Drill-down)
         mid_options = mid_agg["장소중분류"].tolist()
         selected_mid = st.selectbox(f"2단계: [{selected_major}] 내 중분류 선택 (소분류 상세 조회):", mid_options, index=0, key="t2_mid_select")
 
@@ -483,32 +481,31 @@ with tab2:
         fig_sub.update_traces(texttemplate="%{text:,}" + s_unit, textposition="outside", cliponaxis=False)
         apply_chart_theme(fig_sub, f"[2단계: {selected_major} > {selected_mid}] 소분류별 {place_metric}", height=380)
         fig_sub.update_layout(xaxis_tickangle=-30, coloraxis_showscale=False)
-        st.plotly_chart(fig_sub, width="stretch")
+        st.plotly_chart(fig_sub, use_container_width=True)
 
     with col_t2_right:
-        st.subheader("2. 화재 유형 · 장소별 피해 수준 비교")
-        
+        st.markdown("<div class='chart-section-title'>3. 화재 유형 · 장소별 인명/재산 피해 심각도 비교</div>", unsafe_allow_html=True)
+
         cmp_metric = st.selectbox(
-            "비교 피해 지표 선택",
-            ["건당 평균 재산피해액 (만원)", "건당 평균 인명피해 (명)", "총 재산피해액 (억원)", "총 인명피해 (명)", "화재 발생 건수 (건)"],
+            "피해 심각도 지표 선택",
+            ["건당 평균 재산피해액 (만원)", "건당 평균 인명피해 (명)", "총 재산피해액 (억원)", "총 인명피해 (명)"],
             key="t2_cmp_metric"
         )
-        
-        # 특정 분야(산업시설 등) 피해금액 집중 시 격차를 보정하기 위한 로그 스케일 옵션
+
         is_money_metric = "재산피해" in cmp_metric
         col_cmp_sub1, col_cmp_sub2 = st.columns([1.5, 1])
         with col_cmp_sub1:
             target_places = st.multiselect(
                 "비교 대상 장소 대분류 선택",
                 options=major_places,
-                default=["주거", "산업시설", "자동차,철도차량", "생활서비스", "판매,업무시설"],
+                default=[p for p in ["주거", "산업시설", "자동차,철도차량", "생활서비스", "판매,업무시설"] if p in major_places],
                 key="t2_places_multi"
             )
         with col_cmp_sub2:
             use_log_bar = st.checkbox(
                 "로그 스케일 (Log Scale) 축 적용",
                 value=is_money_metric,
-                help="특정 장소의 압도적인 피해금액으로 인해 다른 장소의 수치가 묻히는 현상을 보정하여 고르게 비교합니다.",
+                help="특정 장소의 압도적인 피해금액으로 인해 다른 장소의 수치가 묻히는 현상을 보정합니다.",
                 key="t2_log_bar_chk"
             )
 
@@ -520,8 +517,16 @@ with tab2:
                 재산피해_천원=("재산피해소계", "sum")
             ).reset_index()
 
-            grouped_cmp["건당_재산피해_만원"] = (grouped_cmp["재산피해_천원"] * 1000 / grouped_cmp["건수"] / 10_000).round(1)
-            grouped_cmp["건당_인명피해_명"] = (grouped_cmp["인명피해"] / grouped_cmp["건수"]).round(3)
+            grouped_cmp["건당_재산피해_만원"] = np.where(
+                grouped_cmp["건수"] > 0,
+                (grouped_cmp["재산피해_천원"] * 1000 / grouped_cmp["건수"] / 10_000).round(1),
+                0
+            )
+            grouped_cmp["건당_인명피해_명"] = np.where(
+                grouped_cmp["건수"] > 0,
+                (grouped_cmp["인명피해"] / grouped_cmp["건수"]).round(3),
+                0
+            )
             grouped_cmp["총_재산피해_억원"] = (grouped_cmp["재산피해_천원"] * 1000 / 100_000_000).round(2)
 
             if "건당 평균 재산피해액" in cmp_metric:
@@ -530,13 +535,15 @@ with tab2:
                 y_field, fmt, text_tmpl = "건당_인명피해_명", ":.3f명", "%{y:.2f}명"
             elif "총 재산피해액" in cmp_metric:
                 y_field, fmt, text_tmpl = "총_재산피해_억원", ":,.2f억원", "%{y:,.1f}억"
-            elif "총 인명피해" in cmp_metric:
-                y_field, fmt, text_tmpl = "인명피해", ":,명", "%{y:,}명"
             else:
-                y_field, fmt, text_tmpl = "건수", ":,건", "%{y:,}건"
+                y_field, fmt, text_tmpl = "인명피해", ":,명", "%{y:,}명"
+
+            plot_cmp = grouped_cmp.copy()
+            if use_log_bar:
+                plot_cmp = plot_cmp[plot_cmp[y_field] > 0]
 
             fig_cmp = px.bar(
-                grouped_cmp,
+                plot_cmp,
                 x="화재유형",
                 y=y_field,
                 text=y_field,
@@ -553,24 +560,26 @@ with tab2:
             )
             apply_chart_theme(fig_cmp, f"화재 유형 × 장소 대분류 [{cmp_metric}] 비교", height=580)
             if use_log_bar:
-                fig_cmp.update_yaxes(type="log", title=f"<b>{cmp_metric} (로그 스케일)</b>")
+                fig_cmp.update_yaxes(type="log", title=f"<b>{cmp_metric} (로그 스케일, 0 제외)</b>")
             fig_cmp.update_layout(
                 xaxis_tickangle=-15,
                 legend=dict(title=dict(text="<b>장소 대분류</b>"), orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
             )
-            st.plotly_chart(fig_cmp, width="stretch")
+            st.plotly_chart(fig_cmp, use_container_width=True)
 
-            top_cmp = grouped_cmp.loc[grouped_cmp[y_field].idxmax()]
-            st.info(f" **심각도 인사이트:** [{cmp_metric}] 기준 가장 높은 수치를 기록한 조합은 **'{top_cmp['화재유형']} × {top_cmp['장소대분류']}'** (수치: **{top_cmp[y_field]:,}**) 입니다.")
+            if not grouped_cmp.empty:
+                top_cmp = grouped_cmp.loc[grouped_cmp[y_field].idxmax()]
+                st.info(f"**심각도 인사이트:** [{cmp_metric}] 기준 가장 높은 조합은 **'{top_cmp['화재유형']} × {top_cmp['장소대분류']}'** (수치: **{top_cmp[y_field]:,}**) 입니다.")
         else:
             st.warning("비교할 장소 대분류를 최소 1개 이상 선택해 주세요.")
 
 # ----------------------------------------------------
 # TAB 3: 발화요인 심층 분석
+# ① 발화요인 순위/비중 / ② 발화요인×장소대분류 히트맵
 # ----------------------------------------------------
 with tab3:
-    st.markdown("<div class='chart-section-title'> 발화요인 × 장소대분류 크로스탭 히트맵 심층 분석</div>", unsafe_allow_html=True)
-    
+    st.markdown("<div class='chart-section-title'>발화요인 순위·비중 및 장소 교차 심층 분석</div>", unsafe_allow_html=True)
+
     t3_col1, t3_col2 = st.columns([1, 1])
     with t3_col1:
         cause_level = st.radio("발화요인 분류 기준", ["발화요인대분류", "발화요인소분류 (상위 15개)"], horizontal=True, key="t3_cause_radio")
@@ -580,9 +589,9 @@ with tab3:
     is_damage_heat = "재산피해" in heat_metric
     if is_damage_heat:
         use_log_heat = st.toggle(
-            " 피해금액 로그 정규화 (Log Scale) 색상 적용 (권장)",
+            "피해금액 로그 정규화 (Log Scale) 색상 적용 (권장)",
             value=True,
-            help="산업시설 등 특정 분야의 압도적인 피해금액으로 인한 색상 쏠림을 보정하여 전 분야의 피해 규모를 고르게 시각화합니다."
+            help="특정 분야의 압도적인 피해금액으로 인한 색상 쏠림을 보정하여 전 분야의 피해 규모를 고르게 시각화합니다."
         )
     else:
         use_log_heat = False
@@ -608,14 +617,48 @@ with tab3:
         u_str = "천원"
         c_scale = "Reds"
 
+    # ① 발화요인 순위 및 비중 막대그래프
+    st.markdown("<div class='chart-section-title' style='margin-top:10px;'>1. 발화요인별 순위 및 비중</div>", unsafe_allow_html=True)
+    cause_totals = pvt.sum(axis=1).sort_values(ascending=False).reset_index()
+    cause_totals.columns = [cause_col_name, "집계값"]
+    grand_total_t3 = cause_totals["집계값"].sum()
+    cause_totals["비중(%)"] = (cause_totals["집계값"] / grand_total_t3 * 100).round(1) if grand_total_t3 > 0 else 0
+
+    if is_damage_heat:
+        cause_totals["표시텍스트"] = cause_totals.apply(
+            lambda r: f"{format_korean_money(r['집계값'])}원 ({r['비중(%)']}%)", axis=1
+        )
+    else:
+        cause_totals["표시텍스트"] = cause_totals.apply(
+            lambda r: f"{int(r['집계값']):,}{u_str} ({r['비중(%)']}%)", axis=1
+        )
+
+    fig_cause_rank = px.bar(
+        cause_totals.sort_values(by="집계값", ascending=True),
+        x="집계값",
+        y=cause_col_name,
+        orientation="h",
+        text="표시텍스트",
+        color="집계값",
+        color_continuous_scale=c_scale,
+        labels={cause_col_name: cause_col_name, "집계값": heat_metric}
+    )
+    fig_cause_rank.update_traces(textposition="outside", cliponaxis=False)
+    apply_chart_theme(fig_cause_rank, f"[{cause_col_name}] 기준 {heat_metric} 순위 및 비중", height=420)
+    fig_cause_rank.update_layout(coloraxis_showscale=False)
+    st.plotly_chart(fig_cause_rank, use_container_width=True)
+
+    st.markdown("---")
+
+    # ② 발화요인 × 장소대분류 히트맵
+    st.markdown("<div class='chart-section-title'>2. 발화요인 × 장소대분류 크로스탭 히트맵</div>", unsafe_allow_html=True)
+
     row_sort = pvt.sum(axis=1).sort_values(ascending=True).index
     col_sort = pvt.sum(axis=0).sort_values(ascending=False).index
     pvt = pvt.reindex(index=row_sort, columns=col_sort)
 
-    # 색상 스케일 매핑용 z_color 계산 (재산피해이고 로그정규화 적용 시 log10 적용)
     if is_damage_heat and use_log_heat:
         z_color = np.log10(pvt.values + 1)
-        # 로그 스케일에서 0이 아닌 값들 중 상위 75% 백분위수를 임계값으로 적용
         positive_logs = z_color[z_color > 0]
         threshold_color = np.percentile(positive_logs, 75) if len(positive_logs) > 0 else 1.0
     else:
@@ -629,8 +672,7 @@ with tab3:
             val = pvt.loc[r_name, c_name]
             c_val = z_color[r_idx, c_idx]
             text_color = "#ffffff" if c_val >= threshold_color else "#000000"
-            
-            # 재산피해일 때는 알아보기 쉬운 한국어 금액 단위(억/천만/만)로 표시
+
             if is_damage_heat:
                 disp_text = format_korean_money(val)
             else:
@@ -673,8 +715,14 @@ with tab3:
         xaxis=dict(tickangle=-30, title="<b>장소 대분류</b>"),
         yaxis=dict(autorange="reversed", title=f"<b>{cause_col_name}</b>")
     )
-    st.plotly_chart(fig_heat_main, width="stretch")
+    st.plotly_chart(fig_heat_main, use_container_width=True)
 
+    top_cause_row = cause_totals.iloc[0] if not cause_totals.empty else None
     top_pair = pvt.stack().idxmax()
     top_pair_val = pvt.stack().max()
-    st.info(f" **발화요인 인사이트:** 가장 높은 수치를 기록한 조합은 **[{top_pair[0]} × {top_pair[1]}]** (총 **{top_pair_val:,} {u_str}**) 입니다.")
+    top_pair_disp = f"{format_korean_money(top_pair_val)}원 ({top_pair_val:,}천원)" if is_damage_heat else f"{top_pair_val:,} {u_str}"
+
+    st.info(
+        f"**발화요인 인사이트:** [{cause_col_name}] 기준 1위는 **'{top_cause_row[cause_col_name]}'** ({top_cause_row['표시텍스트']})이며, "
+        f"장소 교차 기준 가장 높은 조합은 **[{top_pair[0]} × {top_pair[1]}]** (**{top_pair_disp}**) 입니다."
+    )
